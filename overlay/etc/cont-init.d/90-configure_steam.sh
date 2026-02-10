@@ -1,6 +1,6 @@
+
 print_header "Configure Steam"
 
-# --- CHANGE 1: Update Exec path to /usr/bin/steam (standard for .deb) ---
 steam_autostart_desktop="$(
     cat <<EOF
 [Desktop Entry]
@@ -8,7 +8,7 @@ Encoding=UTF-8
 Type=Application
 Name=Steam
 Comment=Launch steam on login
-Exec=/usr/bin/steam %U ${STEAM_ARGS:-}
+Exec=/usr/games/steam %U ${STEAM_ARGS:-}
 Icon=steam
 OnlyShowIn=XFCE;
 RunHook=0
@@ -44,14 +44,13 @@ default_steam_config="$(
 EOF
 )"
 
-# --- CHANGE 2: Update internal path to .local/share/Steam ---
 default_steam_library_config="$(
     cat <<EOF
 "libraryfolders"
 {
         "0"
         {
-                "path"          "/home/default/.local/share/Steam"
+                "path"          "/home/default/.steam/steam"
                 "label"         "Home"
                 "totalsize"     "0"
                 "update_clean_bytes_tally" "0"
@@ -97,43 +96,33 @@ if [ "${ENABLE_STEAM:-}" = "true" ]; then
         sed -i 's|^autostart.*=.*$|autostart=false|' /etc/supervisor.d/steam.ini
     fi
 
-    # --- CHANGE 3: Update all CONFIG_VDF and LIBRARY_VDF paths ---
-    # We point to .local/share/Steam but also create symlinks for legacy support
-    
-    STEAM_ROOT="${USER_HOME:?}/.local/share/Steam"
-    mkdir -p "${STEAM_ROOT}"
-    
-    # Symlink legacy .steam paths to the new location so SteamVR doesn't break
-    mkdir -p "${USER_HOME:?}/.steam"
-    ln -sfn "${STEAM_ROOT}" "${USER_HOME:?}/.steam/steam"
-    ln -sfn "${STEAM_ROOT}" "${USER_HOME:?}/.steam/root"
-
-    CONFIG_VDF="${STEAM_ROOT}/config/config.vdf"
-    
+    # Ensuring Steam Play is enabled for all titles
+    CONFIG_VDF="${USER_HOME:?}/.steam/steam/config/config.vdf"
     if [ ! -f "${CONFIG_VDF}" ]; then
         print_step_header "Initializing Steam config"
         mkdir -p "$(dirname "${CONFIG_VDF}")"
         echo "${default_steam_config}" >"${CONFIG_VDF}"
-        # Change 4: Ensure PUID/PGID ownership of the .local folder
-        chown -R "${PUID:-99}:${PGID:-100}" "${USER_HOME:?}/.local"
-        chown -R "${PUID:-99}:${PGID:-100}" "${USER_HOME:?}/.steam"
+        chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.steam"
     else
         print_step_header "Steam config already exists, skipping initialization"
     fi
 
-    LIBRARY_VDF="${STEAM_ROOT}/steamapps/libraryfolders.vdf"
+    # Ensure Steam library folder is set to /mnt/games if not already
+    LIBRARY_VDF="${USER_HOME:?}/.steam/steam/steamapps/libraryfolders.vdf"
     if [ ! -f "${LIBRARY_VDF}" ]; then
         print_step_header "Initializing Steam library"
         mkdir -p "$(dirname "${LIBRARY_VDF}")"
         echo "${default_steam_library_config}" >"${LIBRARY_VDF}"
-        
+        chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.steam"
+        # Only if we have mounted a /mnt/games path, then make the default games library for steam
         if [ -d "/mnt/games" ]; then
             mkdir -p "/mnt/games/GameLibrary/Steam/steamapps"
-            chown -R "${PUID:-99}:${PGID:-100}" "/mnt/games/GameLibrary"
+            chown "${USER:?}:${USER:?}" \
+                "/mnt/games/GameLibrary" \
+                "/mnt/games/GameLibrary/Steam" \
+                "/mnt/games/GameLibrary/Steam/steamapps"
             echo "${games_steam_library_config}" >"/mnt/games/GameLibrary/Steam/libraryfolder.vdf"
         fi
-        
-        chown -R "${PUID:-99}:${PGID:-100}" "${USER_HOME:?}/.local"
     else
         print_step_header "Steam library config already exists, skipping initialization"
     fi
@@ -141,8 +130,5 @@ else
     print_step_header "Disable Steam service"
     sed -i 's|^autostart.*=.*$|autostart=false|' /etc/supervisor.d/steam.ini
 fi
-
-# Final recursive permission fix to prevent Disk Write Error
-chown -R "${PUID:-99}:${PGID:-100}" "${USER_HOME:?}/.local"
 
 echo -e "\e[34mDONE\e[0m"
