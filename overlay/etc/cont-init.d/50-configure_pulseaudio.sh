@@ -1,10 +1,12 @@
 
 # Configure dbus
-print_header "Configure pulseaudio"
+print_header "Configure pipewire"
 
-# Always enable the pulseaudio service
-print_step_header "Enable pulseaudio service."
-sed -i 's|^autostart.*=.*$|autostart=true|' /etc/supervisor.d/pulseaudio.ini
+# Always enable the pipwire service
+print_step_header "Enable pipewire services."
+sed -i 's|^autostart.*=.*$|autostart=true|' /etc/supervisor.d/pipewire.ini
+sed -i 's|^autostart.*=.*$|autostart=true|' /etc/supervisor.d/pipewire-pulse.ini
+sed -i 's|^autostart.*=.*$|autostart=true|' /etc/supervisor.d/wireplumber.ini
 
 if [ "${MODE}" == "s" ] | [ "${MODE}" == "secondary" ]; then
     print_step_header "Configure pulseaudio as simple dummy audio"
@@ -22,20 +24,16 @@ else
     chmod -R a+rw ${PULSE_SOCKET_DIR}
     chown -R ${PUID}:${PGID} ${USER_HOME:?}/.config/pulse
 
-    # Configure the palse audio socket
+    # Configure the pulse audio socket
     sed -i "s|^; default-server.*$|default-server = ${PULSE_SERVER}|" /etc/pulse/client.conf
-    sed -i "s|^load-module module-native-protocol-unix.*$|load-module module-native-protocol-unix socket=${PULSE_SOCKET_DIR}/pulse-socket auth-anonymous=1|" \
-        /etc/pulse/default.pa
+    mkdir -p /etc/pipewire
+    cp /usr/share/pipewire/pipewire-pulse.conf /etc/pipewire/pipewire-pulse.conf
+    sed -i "s|\"unix:native\".*$|\"unix:${PULSE_SOCKET_DIR}/pulse-socket\"|" /etc/pipewire/pipewire-pulse.conf
 
     # Disable pulseaudio from respawning (https://unix.stackexchange.com/questions/204522/how-does-pulseaudio-start)
     sed -i 's|^; autospawn.*$|autospawn = no|' /etc/pulse/client.conf
     sed -i 's|^; daemon-binary.*$|daemon-binary = /bin/true|' /etc/pulse/client.conf
-
-    # Enable debug logging
-    if [ "X${DEBUGGING:-}" == "X" ]; then
-        sed -i 's|^; log-level.*$|log-level = debug|' /etc/pulse/daemon.conf
-    fi
 fi
-chown -R ${USER} /etc/pulse
+chown -R ${USER} /etc/pipewire
 
 echo -e "\e[34mDONE\e[0m"
