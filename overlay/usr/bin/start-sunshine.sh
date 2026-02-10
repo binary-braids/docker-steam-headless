@@ -38,6 +38,8 @@ trap _term SIGTERM SIGINT
 mkdir -p "${USER_HOME:?}/.config/sunshine"
 if [ ! -f "${USER_HOME:?}/.config/sunshine/sunshine.conf" ]; then
     cp -vf /templates/sunshine/sunshine.conf "${USER_HOME:?}/.config/sunshine/sunshine.conf"
+    #sed -i "s|^audio_sink = .*$|audio_sink = sink-sunshine-stereo.monitor|" "${USER_HOME:?}/.config/sunshine/sunshine.conf"
+    echo "audio_sink = sink-sunshine-stereo.monitor" >> "${USER_HOME:?}/.config/sunshine/sunshine.conf"
 fi
 if [ ! -f "${USER_HOME:?}/.config/sunshine/apps.json" ]; then
     cp -vf /templates/sunshine/apps.json "${USER_HOME:?}/.config/sunshine/apps.json"
