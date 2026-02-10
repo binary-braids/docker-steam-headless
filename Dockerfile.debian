@@ -472,9 +472,9 @@ RUN \
         && apt-get update \
     && \
     echo "**** Install Steam ****" \
-        && apt-get install -y --no-install-recommends \
-            steam-installer \
-        && ln -sf /usr/games/steam /usr/bin/steam \
+    && wget -O /tmp/steam.deb https://repo.steampowered.com/steam/archive/stable/steam_latest.deb && \
+    apt-get install -y /tmp/steam.deb && \
+    rm /tmp/steam.deb \
     && \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \
