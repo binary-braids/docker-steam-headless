@@ -1,4 +1,4 @@
-FROM debian:trixie-slim
+FROM debian:bookworm-slim
 LABEL maintainer="Josh.5 <jsunnex@gmail.com>"
 
 # Update package repos
@@ -18,7 +18,6 @@ RUN \
         && apt-get install -y --no-install-recommends \
             locales \
         && echo 'en_US.UTF-8 UTF-8' > /etc/locale.gen \
-        && echo 'en_GB.UTF-8 UTF-8' >> /etc/locale.gen \
         && locale-gen \
     && \
     echo "**** Section cleanup ****" \
@@ -68,7 +67,7 @@ RUN \
             jq \
             less \
             man-db \
-            plocate \
+            mlocate \
             nano \
             net-tools \
             p7zip-full \
@@ -146,6 +145,7 @@ RUN \
     echo
 
 # Install X Server requirements
+# TODO: Refine this list of packages to only what is required.
 ENV \
     XORG_SOCKET_DIR="/tmp/.X11-unix" \
     XDG_RUNTIME_DIR="/tmp/.X11-unix/run" \
@@ -161,7 +161,6 @@ RUN \
             dbus-x11 \
             libxcomposite-dev \
             libxcursor1 \
-            libxcb-cursor0 \
             wmctrl \
             libfuse2 \
             x11-utils \
@@ -174,6 +173,7 @@ RUN \
             xclip \
             xcvt \
             xdotool \
+            xfishtank \
             xfonts-base \
             xinit \
             xorg \
@@ -202,11 +202,14 @@ RUN \
     echo "**** Update apt database ****" \
         && apt-get update \
     && \
-    echo "**** Install pulseaudio requirements ****" \
+    echo "**** Install pipewire requirements ****" \
         && apt-get install -y --no-install-recommends \
-            pulseaudio \
+            pulseaudio-utils \
+            pipewire-audio \
+            pipewire-pulse \
+            wireplumber \
             alsa-utils \
-            libasound2t64 \
+            libasound2 \
             libasound2-plugins \
     && \
     echo "**** Section cleanup ****" \
@@ -220,6 +223,7 @@ RUN \
     echo
 
 # Install desktop environment
+# TODO: Specify all needed packages and add '--no-install-recommends'
 RUN \
     echo "**** Update apt database ****" \
         && apt-get update \
@@ -241,25 +245,29 @@ RUN \
             xdg-utils \
             xfce4 \
             xfce4-terminal \
+        # Delete these as they are not needed at all
         && rm -f \
             /usr/share/applications/software-properties-drivers.desktop \
             /usr/share/applications/xfce4-about.desktop \
             /usr/share/applications/xfce4-session-logout.desktop \
-        && [ -f /usr/share/applications/xfce4-accessibility-settings.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-accessibility-settings.desktop || true \
-        && [ -f /usr/share/applications/xfce4-color-settings.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-color-settings.desktop || true \
-        && [ -f /usr/share/applications/xfce4-mail-reader.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-mail-reader.desktop || true \
-        && [ -f /usr/share/applications/xfce4-web-browser.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-web-browser.desktop || true \
-        && [ -f /usr/share/applications/vim.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/vim.desktop || true \
-        && [ -f /usr/share/applications/thunar-settings.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/thunar-settings.desktop || true \
-        && [ -f /usr/share/applications/thunar.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/thunar.desktop || true \
-        && [ -f /usr/share/applications/pavucontrol.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/pavucontrol.desktop || true \
-        && [ -f /usr/share/applications/x11vnc.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/x11vnc.desktop || true \
-        && [ -f /usr/share/applications/display-im6.q16.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/display-im6.q16.desktop || true \
-        && [ -f /usr/share/applications/debian-xterm.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/debian-xterm.desktop || true \
-        && [ -f /usr/share/applications/debian-uxterm.desktop ] && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/debian-uxterm.desktop || true \
-        && [ -f /usr/share/applications/xfce4-appfinder.desktop ] && sed -i 's/^Categories=.*$/Categories=System;/' /usr/share/applications/xfce4-appfinder.desktop || true \
-        && [ -f /usr/share/applications/thunar-bulk-rename.desktop ] && sed -i 's/^Categories=.*$/Categories=System;/' /usr/share/applications/thunar-bulk-rename.desktop || true \
-        && [ -f /usr/share/applications/org.gnome.gedit.desktop ] && sed -i 's/^Categories=.*$/Categories=System;/' /usr/share/applications/org.gnome.gedit.desktop || true \
+        # Hide these apps. They can be displayed if a user really wants them.
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-accessibility-settings.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-color-settings.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-mail-reader.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/xfce4-web-browser.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/vim.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/thunar-settings.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/thunar.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/pavucontrol.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/x11vnc.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/display-im6.q16.desktop \
+        # These are named specifically for Debain
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/debian-xterm.desktop \
+        && sed -i '/[Desktop Entry]/a\NoDisplay=true' /usr/share/applications/debian-uxterm.desktop \
+        # Force these apps to be "System" Apps rather than "Categories=System;Utility;Core;GTK;Filesystem;"
+        && sed -i 's/^Categories=.*$/Categories=System;/' /usr/share/applications/xfce4-appfinder.desktop \
+        && sed -i 's/^Categories=.*$/Categories=System;/' /usr/share/applications/thunar-bulk-rename.desktop \
+        && sed -i 's/^Categories=.*$/Categories=System;/' /usr/share/applications/org.gnome.gedit.desktop \
     && \
     echo "**** Install WoL Manager requirements ****" \
         && apt-get install -y \
@@ -282,12 +290,6 @@ ENV \
 RUN \
     echo "**** Update apt database ****" \
         && apt-get update \
-    && \
-    echo "**** Install D-Bus system services ****" \
-        && apt-get install -y --no-install-recommends \
-            accountsservice \
-            polkitd \
-            pkexec \
     && \
     echo "**** Install flatpak support ****" \
         && apt-get install -y --no-install-recommends \
@@ -362,9 +364,11 @@ RUN \
         && wget -O /tmp/websockify.tar.gz https://github.com/novnc/websockify/archive/v${WEBSOCKETIFY_VERSION}.tar.gz \
     && \
     echo "**** Extract Websockify ****" \
+        && cd /tmp \
         && tar -xvf /tmp/websockify.tar.gz \
     && \
-    echo "**** Install Websockify ****" \
+    echo "**** Install Websockify to Web Frontend path ****" \
+        && cd /tmp \
         && mv -v /tmp/websockify-${WEBSOCKETIFY_VERSION} /opt/frontend/utils/websockify \
     && \
     echo "**** Section cleanup ****" \
@@ -372,6 +376,7 @@ RUN \
         && apt-get autoremove -y \
         && rm -rf \
             /var/lib/apt/lists/* \
+            /tmp/websockify-* \
             /tmp/websockify.tar.gz
 
 # Setup audio streaming deps
@@ -396,7 +401,7 @@ RUN \
             gstreamer1.0-vaapi \
             gstreamer1.0-x \
             libgstreamer1.0-0 \
-            libncursesw6 \
+            libncursesw5 \
             libopenal1 \
             libsdl-image1.2 \
             libsdl-ttf2.0-0 \
@@ -407,14 +412,19 @@ RUN \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
-        && rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/*
+        && rm -rf \
+            /var/lib/apt/lists/* \
+            /var/tmp/* \
+            /tmp/* \
+    && \
+    echo
 
 # Setup video streaming deps
 RUN \
     echo "**** Update apt database ****" \
         && apt-get update \
     && \
-    echo "**** Install Intel media drivers ****" \
+    echo "**** Install Intel media drivers and VAAPI ****" \
         && apt-get install -y --no-install-recommends \
             intel-media-va-driver-non-free \
             i965-va-driver-shaders \
@@ -423,14 +433,19 @@ RUN \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
-        && rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/*
+        && rm -rf \
+            /var/lib/apt/lists/* \
+            /var/tmp/* \
+            /tmp/* \
+    && \
+    echo
 
-# Hardware monitoring tools
+# Install tools for monitoring hardware
 RUN \
     echo "**** Update apt database ****" \
         && apt-get update \
     && \
-    echo "**** Install HW tools ****" \
+    echo "**** Install useful HW monitoring tools ****" \
         && apt-get install -y --no-install-recommends \
             cpu-x \
             htop \
@@ -440,47 +455,61 @@ RUN \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
-        && rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/*
+        && rm -rf \
+            /var/lib/apt/lists/* \
+            /var/tmp/* \
+            /tmp/* \
+    && \
+    echo
 
-# --- CUSTOMIZED STEAM INSTALL FOR STEAMVR ---
+# Install Steam
 RUN \
     echo "**** Update apt database ****" \
         && dpkg --add-architecture i386 \
         && apt-get update \
     && \
-    echo "**** Install Steam from Valve .deb ****" \
-        && wget -O /tmp/steam.deb https://repo.steampowered.com/steam/archive/stable/steam_latest.deb \
-        && (apt-get install -y /tmp/steam.deb || apt-get install -f -y) \
-        && rm /tmp/steam.deb \
+    echo "**** Install Steam ****" \
+        && apt-get install -y --no-install-recommends \
+            steam-installer \
+            gamescope \
+        && ln -sf /usr/games/steam /usr/bin/steam \
     && \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
-        && rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/*
+        && rm -rf \
+            /var/lib/apt/lists/* \
+            /var/tmp/* \
+            /tmp/* \
+    && \
+    echo
 
-# --- CUSTOMIZED SUNSHINE INSTALL (FIXED EXIT CODE 5) ---
+# Install Sunshine
+COPY --from=lizardbyte/sunshine:v2025.122.141614-debian-bookworm /sunshine.deb /usr/src/sunshine.deb
 RUN \
     echo "**** Update apt database ****" \
         && apt-get update \
     && \
     echo "**** Install Sunshine requirements ****" \
-        && apt-get install -y va-driver-all libevdev2 libpulse0 \
-    && \
-    echo "**** Download latest Sunshine release ****" \
-        && SUNSHINE_RELEASE=$(curl -sX GET "https://api.github.com/repos/LizardByte/Sunshine/releases/latest" | jq -r '.tag_name') \
-        && SUNSHINE_URL=$(curl -sX GET "https://api.github.com/repos/LizardByte/Sunshine/releases/latest" | jq -r '.assets[] | select(.name | contains("sunshine-debian-trixie-amd64.deb")) | .browser_download_url') \
-        && echo "Downloading Sunshine ${SUNSHINE_RELEASE} from ${SUNSHINE_URL}" \
-        && wget -O /tmp/sunshine.deb "${SUNSHINE_URL}" \
+        && apt-get install -y \
+            va-driver-all \
     && \
     echo "**** Install Sunshine ****" \
-        && (dpkg -i /tmp/sunshine.deb || apt-get install -f -y) \
+        && apt-get install -y \
+            /usr/src/sunshine.deb \
     && \
     echo "**** Section cleanup ****" \
         && apt-get clean autoclean -y \
         && apt-get autoremove -y \
-        && rm -rf /var/lib/apt/lists/* /var/tmp/* /tmp/sunshine.deb
+        && rm -rf \
+            /var/lib/apt/lists/* \
+            /var/tmp/* \
+            /tmp/* \
+    && \
+    echo
 
-# Neko server
+# TODO: Deprecate neko
+# Install Neko server
 COPY --from=m1k1o/neko:base /usr/bin/neko /usr/bin/neko
 COPY --from=m1k1o/neko:base /var/www /var/www
 
@@ -500,21 +529,28 @@ RUN \
             --pre \
             --upgrade \
             --no-cache-dir \
-            git+https://github.com/Steam-Headless/dumb-udev.git@${DUMB_UDEV_VERSION}
+            git+https://github.com/Steam-Headless/dumb-udev.git@${DUMB_UDEV_VERSION} \
+    && \
+    echo
 
 # Add FS overlay
 COPY overlay /
 
-# Set environment variables
+# Set display environment variables
 ENV \
     DISPLAY_CDEPTH="24" \
     DISPLAY_REFRESH="120" \
     DISPLAY_SIZEH="900" \
     DISPLAY_SIZEW="1600" \
     DISPLAY_VIDEO_PORT="DFP" \
-    DISPLAY=":55" \
+    DISPLAY=":55"
+ENV \
     NVIDIA_DRIVER_CAPABILITIES="all" \
-    NVIDIA_VISIBLE_DEVICES="all" \
+    NVIDIA_VISIBLE_DEVICES="all"
+
+# Set container configuration environment variables
+# TODO: Set the default WEBUI_USER & WEBUI_PASS after release of SHUI
+ENV \
     MODE="primary" \
     WEB_UI_MODE="vnc" \
     ENABLE_VNC_AUDIO="true" \
@@ -522,11 +558,21 @@ ENV \
     NEKO_PASSWORD_ADMIN=admin \
     ENABLE_STEAM="true" \
     STEAM_ARGS="-silent" \
+    WEBUI_USER="" \
+    WEBUI_PASS="" \
     ENABLE_SUNSHINE="true" \
     ENABLE_EVDEV_INPUTS="true" \
-    PORT_NOVNC_WEB="8083"
+    ENABLE_WOL_POWER_MANAGER="false" \
+    ENABLE_SID="false"
 
+# Configure required ports
+ENV \
+    PORT_NOVNC_WEB="8083" \
+    NEKO_NAT1TO1=""
+
+# Expose the required ports
 EXPOSE 8083
 
+# Set entrypoint
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
