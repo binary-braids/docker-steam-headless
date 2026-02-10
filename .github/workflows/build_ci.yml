@@ -1,170 +1,164 @@
-name: Build and Deploy CI
+name: CI
 
 on:
-  workflow_dispatch:
   push:
-    branches: ['dev-**', 'pr-**', staging, master]
-    tags: ['**']
+    branches:
+      - "main"
   pull_request:
-    branches: [staging, master]
-  schedule:
-    # At 02:30 on Saturday
-    - cron: '30 2 * * 6'
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+  security-events: write
+
+env:
+  APP_NAME: docker-headless
 
 jobs:
-  build_docker:
-    name: Build Docker Image
+  build_and_test:
+    name: Build and Test
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        flavour: ['debian', 'arch']
-
     steps:
-      # ---
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
-      # ---
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 #v3.8.0
-
-      # ---
-      - name: Prepare
-        if: success()
-        id: prepare
-        run: |
-          FLAVOUR=${{ matrix.flavour }}
-          echo  "FLAVOUR='${FLAVOUR}'"
-          echo  "GITHUB_REF='${GITHUB_REF}'"
-          echo  "GITHUB_REPOSITORY='${GITHUB_REPOSITORY}'"
-          VERSION_TAG=${GITHUB_REF#refs/*/}
-          SHA_SHORT="${GITHUB_SHA::7}"
-          ORG=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
-          SERVICE_NAME=steam-headless
-          DOCKER_HUB_IMAGE=docker.io/josh5/${SERVICE_NAME:?}
-          GHCR_IMAGE=ghcr.io/${ORG:?}/${SERVICE_NAME:?}
-
-          DOCKER_TAGS=""
-          if [[ ${GITHUB_REF} == refs/heads/master ]]; then
-            if [[ ${FLAVOUR} == 'debian' ]]; then
-              DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:latest,${GHCR_IMAGE}:latest,${GHCR_IMAGE}:stable,"
-            fi
-            DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${FLAVOUR},${GHCR_IMAGE}:${FLAVOUR},"
-          elif [[ ${GITHUB_REF} == refs/heads/staging ]]; then
-            DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${FLAVOUR}-staging,${GHCR_IMAGE}:${FLAVOUR}-staging,"
-          elif [[ ${GITHUB_REF} == refs/heads/dev-* ]]; then
-            DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${FLAVOUR}-${VERSION_TAG},${GHCR_IMAGE}:${FLAVOUR}-${VERSION_TAG},"
-          elif [[ ${GITHUB_REF} == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-            if [[ ${VERSION} =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}[-\w]*$ ]]; then
-              DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:${FLAVOUR}-${VERSION},${GHCR_IMAGE}:${FLAVOUR}-${VERSION},"
-              if [[ ${FLAVOUR} == 'debian' ]]; then
-                DOCKER_TAGS="${DOCKER_TAGS}${DOCKER_HUB_IMAGE}:latest,${GHCR_IMAGE}:latest,"
-              fi
-              
-            fi
-          elif [[ ${GITHUB_REF} == refs/pull/* ]]; then
-            PR_NUMBER=$(echo ${GITHUB_REF} | cut -d'/' -f3)
-            # For PR builds, only tag the GHCR image.
-            DOCKER_TAGS="${GHCR_IMAGE}:pr-${PR_NUMBER},"
-          fi
-          echo "DOCKER_TAGS='${DOCKER_TAGS}'"
-
-          echo "Build: [$(date +"%F %T")] [${GITHUB_REF_NAME}] [${GITHUB_SHA}] [${FLAVOUR}]" > ./overlay/version.txt
-
-          DOCKER_PUSH="true"
-          if [[ ${DOCKER_HUB_IMAGE} != 'docker.io/josh5/steam-headless' ]]; then
-            DOCKER_PUSH="false"
-          fi
-          if [[ ${VERSION_TAG%/merge} =~ "pr-"* ]]; then
-            DOCKER_PUSH="false"
-          fi
-          if [[ ${VERSION_TAG%/merge} =~ ^[0-9]+$ ]]; then
-            DOCKER_PUSH="false"
-          fi
-          if [[ "X${DOCKER_TAGS}" == "X" ]]; then
-            DOCKER_PUSH="false"
-          fi
-          echo "DOCKER_PUSH='${DOCKER_PUSH}'"
-          cat ./overlay/version.txt
-
-          echo "docker_hub_image:${DOCKER_HUB_IMAGE:?}"
-          echo "docker_hub_image=${DOCKER_HUB_IMAGE:?}" >> $GITHUB_OUTPUT
-
-          echo "ghcr_image:${GHCR_IMAGE:?}"
-          echo "ghcr_image=${GHCR_IMAGE:?}" >> $GITHUB_OUTPUT
-
-          echo "sha_short:${SHA_SHORT:?}"
-          echo "sha_short=${SHA_SHORT:?}" >> $GITHUB_OUTPUT
-
-          echo "service_name:${SERVICE_NAME:?}"
-          echo "service_name=${SERVICE_NAME:?}" >> $GITHUB_OUTPUT
-
-          echo "docker_image:${DOCKER_HUB_IMAGE:?}"
-          echo "docker_image=${DOCKER_HUB_IMAGE:?}" >> $GITHUB_OUTPUT
-
-          echo "docker_tags:$(echo ${DOCKER_TAGS} | sed 's/,$//')"
-          echo "docker_tags=$(echo ${DOCKER_TAGS} | sed 's/,$//')" >> $GITHUB_OUTPUT
-
-          echo "docker_push:${DOCKER_PUSH:?}"
-          echo "docker_push=${DOCKER_PUSH:?}" >> $GITHUB_OUTPUT
-
-          echo "docker_build_date:${BUILD_DATE:?}" 
-          echo "docker_build_date=${BUILD_DATE:?}" >> $GITHUB_OUTPUT
-
-          echo "docker_platforms=linux/amd64" >> $GITHUB_OUTPUT
-
-      # ---
-      - name: Log into GHCR registry
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+      - name: Generate GitHub App Token 🪙
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2
+        id: generate-token
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          app_id: ${{ secrets.BRAID_BOT_APP_ID }}
+          private_key: ${{ secrets.BRAID_BOT_PRIVATE_KEY }}
 
-      # ---
-      - name: Log into Docker Hub registry
-        if: success() && (startsWith(github.ref, 'refs/heads/') || startsWith(github.ref, 'refs/tags/'))
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 #v3.3.0
+      - name: Checkout 🔔
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.generate-token.outputs.token }}
 
-      # ---
-      - name: Docker meta
-        if: success()
-        id: meta
-        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 #v5.6.1
-        with:
-          images: |
-            ${{ steps.prepare.outputs.docker_image }}
-          labels: |
-            maintainer=Josh.5
-            source.version=${{ steps.prepare.outputs.sha_short }}
-            source.project=Steam Headless
-            source.service=${{ steps.prepare.outputs.service_name }}
-            org.opencontainers.image.title=${{ steps.prepare.outputs.service_name }}
-            org.opencontainers.image.created=${{ steps.prepare.outputs.docker_build_date }}
-
-      # ---
-      - name: Build Image
-        if: success()
-        uses: docker/build-push-action@b32b51a8eda65d6793cd0494a773d4f6bcef32dc #v6.11.0
+      - name: Setup Docker Buildx 🖥️
+        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3
+          
+      - name: Build Container 🏗️
+        uses: docker/build-push-action@15560696de535e4014efeff63c48f16952e52dd1 # v6
         with:
           context: .
-          file: Dockerfile.${{ matrix.flavour }}
-          platforms: ${{ steps.prepare.outputs.docker_platforms }}
-          pull: 'true'
-          push: ${{ steps.prepare.outputs.docker_push }}
+          push: false
+
+  release:
+    name: Release
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs:
+      - build_and_test
+
+    outputs:
+      skipped: ${{ steps.changelog.outputs.skipped }}
+      tag: ${{ steps.changelog.outputs.tag }}
+      clean_changelog: ${{ steps.changelog.outputs.clean_changelog }}
+      version: ${{ steps.changelog.outputs.version }}      
+
+    steps:
+
+      - name: Generate GitHub App Token 🪙
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2
+        id: generate-token
+        with:
+          app_id: ${{ secrets.BRAID_BOT_APP_ID }}
+          private_key: ${{ secrets.BRAID_BOT_PRIVATE_KEY }}
+
+      - name: Checkout 🔔
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Conventional Changelog Action 📋
+        id: changelog
+        uses: TriPSs/conventional-changelog-action@67139193614f5b9e8db87da1bd4240922b34d765 # v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          git-user-name: "braid-bot[bot]"
+          git-user-email: "169546839+braid-bot[bot]@users.noreply.github.com"
+          release-count: 10
+          skip-on-empty: "false"
+          version-file: package.yaml
+          create-summary: true
+
+      - name: Generate Release 📦
+        if: ${{ steps.changelog.outputs.skipped == 'false' }}
+        uses: softprops/action-gh-release@a74c6b72af54cfa997e81df42d94703d6313a2d0 # v2
+        with:
+          tag_name: ${{ steps.changelog.outputs.tag }}
+          name: ${{ steps.changelog.outputs.tag }}
+          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.clean_changelog }}
+
+
+  publish:
+    name: Publish
+    if: github.event_name != 'pull_request' && needs.release.outputs.skipped == 'false'
+    runs-on: ubuntu-latest
+    needs:
+      - release
+    steps:
+
+      - name: Generate GitHub App Token 🪙
+        uses: tibdex/github-app-token@3beb63f4bd073e61482598c45c71c1019b59b73a # v2
+        id: generate-token
+        with:
+          app_id: ${{ secrets.BRAID_BOT_APP_ID }}
+          private_key: ${{ secrets.BRAID_BOT_PRIVATE_KEY }}
+
+      - name: Checkout 🔔
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Login to GitHub Container Registry 🔓
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
+        with:
+          registry: ghcr.io  
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} 
+
+      - name: Docker Metadata 🏷️
+        id: meta
+        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}          
           tags: |
-            ${{ steps.prepare.outputs.docker_tags }}
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ steps.prepare.outputs.service_name }}-${{ matrix.flavour }}-main
-          cache-to: type=gha,scope=${{ steps.prepare.outputs.service_name }}-${{ matrix.flavour }}-main,mode=max
+            latest
+            ${{ needs.release.outputs.version}}
+            ${{ github.sha }}
+
+      - name: Setup QEMU 🖥️
+        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
+
+      - name: Setup Docker Buildx 🖥️
+        uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3
+        
+      - name: Build and push 🏗️
+        uses: docker/build-push-action@15560696de535e4014efeff63c48f16952e52dd1 # v6
+        with:
+          context: .
+          platforms: linux/amd64
+          provenance: false
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Run Trivy Vulnerability Scanner 🏰
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ env.APP_NAME }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          vuln-type: 'os,library'
+          severity: "HIGH,CRITICAL"
+
+      - name: Upload Trivy scan results to GitHub Security tab 📮
+        uses: github/codeql-action/upload-sarif@23acc5c183826b7a8a97bce3cecc52db901f8251 # v3
+        with:
+          sarif_file: 'trivy-results.sarif'
