@@ -12,17 +12,16 @@ set -e
 
 # CATCH TERM SIGNAL:
 _term() {
-    kill -TERM "$pulseaudio_pid" 2>/dev/null
+    kill -TERM "$pipewire_pulse_pid" 2>/dev/null
 }
 trap _term SIGTERM SIGINT
 
 
 # EXECUTE PROCESS:
-echo "PULSEAUDIO: Starting pulseaudio service"
-#/usr/bin/pulseaudio --disallow-module-loading --disallow-exit --exit-idle-time=-1 &
-/usr/bin/pulseaudio --exit-idle-time=-1 &
-pulseaudio_pid=$!
+echo "PIPEWIRE-PULSE: Starting pipewire-pulse service"
+/usr/bin/pipewire-pulse &
+pipewire_pulse_pid=$!
 
 
 # WAIT FOR CHILD PROCESS:
-wait "$pulseaudio_pid"
+wait "$pipewire_pulse_pid"
