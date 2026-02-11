@@ -474,9 +474,16 @@ RUN \
         && dpkg --add-architecture i386 \
         && apt-get update \
     && \
-    echo "**** Install Steam ****" \
+    echo "**** Install Steam dependencies and .deb ****" \
         && apt-get install -y --no-install-recommends \
-            steam-installer \
+            wget \
+            ca-certificates \
+            libgl1-mesa-dri:i386 \
+            libgl1-mesa-glx:i386 \
+            libgbm1:i386 \
+        && wget https://repo.steampowered.com/steam/archive/stable/steam_latest.deb -O /tmp/steam.deb \
+        # Using apt to install the local .deb handles dependency resolution automatically
+        && apt-get install -y /tmp/steam.deb \
         && ln -sf /usr/games/steam /usr/bin/steam \
     && \
     echo "**** Section cleanup ****" \
@@ -484,6 +491,7 @@ RUN \
         && apt-get autoremove -y \
         && rm -rf \
             /var/lib/apt/lists/* \
+            /tmp/steam.deb \
             /var/tmp/* \
             /tmp/* \
     && \
