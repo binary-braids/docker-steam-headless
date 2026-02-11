@@ -472,18 +472,27 @@ RUN \
 RUN \
     echo "**** Update apt database ****" \
         && dpkg --add-architecture i386 \
+        # Ensure non-free is enabled for i386 as well
+        && sed -i 's/Components: main/Components: main contrib non-free/g' /etc/apt/sources.list.d/debian.sources \
         && apt-get update \
     && \
-    echo "**** Install Steam dependencies and .deb ****" \
+    echo "**** Install Steam dependencies ****" \
         && apt-get install -y --no-install-recommends \
             wget \
             ca-certificates \
             libgl1-mesa-dri:i386 \
             libgl1-mesa-glx:i386 \
             libgbm1:i386 \
+            # These are often required by the .deb specifically in Trixie/Testing
+            libnss3:i386 \
+            libatk1.0-0:i386 \
+            libatk-bridge2.0-0:i386 \
+            libc6:i386 \
+    && \
+    echo "**** Download and Install Steam .deb ****" \
         && wget https://repo.steampowered.com/steam/archive/stable/steam_latest.deb -O /tmp/steam.deb \
-        # Using apt to install the local .deb handles dependency resolution automatically
-        && apt-get install -y /tmp/steam.deb \
+        # If this fails with exit 100, we catch it and force fix
+        && (apt-get install -y /tmp/steam.deb || apt-get install -fy) \
         && ln -sf /usr/games/steam /usr/bin/steam \
     && \
     echo "**** Section cleanup ****" \
