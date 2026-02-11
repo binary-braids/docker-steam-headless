@@ -2,7 +2,7 @@
 
 print_header "Configure Steam"
 
-# The .deb installation uses /usr/games/steam as the primary binary
+# Desktop entry for XFCE/Desktop mode
 steam_autostart_desktop="$(
     cat <<EOF
 [Desktop Entry]
@@ -20,6 +20,7 @@ Hidden=false
 EOF
 )"
 
+# Config to enable Steam Play (Proton) for all titles
 default_steam_config="$(
     cat <<EOF
 "InstallConfigStore"
@@ -46,7 +47,7 @@ default_steam_config="$(
 EOF
 )"
 
-# Updated path "0" to .local/share/Steam which is the .deb default
+# libraryfolders.vdf updated for the .deb data path
 default_steam_library_config="$(
     cat <<EOF
 "libraryfolders"
@@ -89,54 +90,73 @@ EOF
 )"
 
 if [ "${ENABLE_STEAM:-}" = "true" ]; then
-    # --- PATH INITIALIZATION FOR .DEB VERSION ---
-    # The official .deb expects this directory for the actual client data
-    mkdir -p "${USER_HOME:?}/.local/share/Steam"
+    print_step_header "Ensuring Official Steam Path Structure"
     
+    # 1. Create the real data directory (XDG Standard for .deb version)
+    mkdir -p "${USER_HOME:?}/.local/share/Steam"
+    mkdir -p "${USER_HOME:?}/.steam"
+
+    # 2. Fix the Symlink Structure (Prevents "Could not setup steam data")
+    # Steam .deb MUST have ~/.steam/steam as a link to .local/share/Steam
+    if [ -d "${USER_HOME}/.steam/steam" ] && [ ! -L "${USER_HOME}/.steam/steam" ]; then
+        echo "Moving existing data and converting ~/.steam/steam to symlink..."
+        cp -r "${USER_HOME}/.steam/steam/"* "${USER_HOME}/.local/share/Steam/" 2>/dev/null
+        rm -rf "${USER_HOME}/.steam/steam"
+    fi
+
+    if [ ! -L "${USER_HOME}/.steam/steam" ]; then
+        ln -sf "${USER_HOME}/.local/share/Steam" "${USER_HOME}/.steam/steam"
+    fi
+
+    # 3. Ensure 'root' link exists as well
+    if [ ! -L "${USER_HOME}/.steam/root" ]; then
+        ln -sf "${USER_HOME}/.local/share/Steam" "${USER_HOME}/.steam/root"
+    fi
+
+    # Determine startup mode
     if [ "${MODE}" == "s" ] || [ "${MODE}" == "secondary" ]; then
         print_step_header "Enable Steam supervisor.d service"
         sed -i 's|^autostart.*=.*$|autostart=true|' /etc/supervisor.d/steam.ini
     else
         print_step_header "Enable Steam auto-start script"
-        mkdir -p "${USER_HOME:?}/.config/autostart"
-        echo "${steam_autostart_desktop:?}" >"${USER_HOME:?}/.config/autostart/Steam.desktop"
+        mkdir -p "${USER_HOME}/.config/autostart"
+        echo "${steam_autostart_desktop:?}" >"${USER_HOME}/.config/autostart/Steam.desktop"
         sed -i 's|^autostart.*=.*$|autostart=false|' /etc/supervisor.d/steam.ini
     fi
 
-    # Ensuring Steam Play is enabled for all titles
-    # For the .deb version, config.vdf is located under the linked .steam/steam path
-    CONFIG_VDF="${USER_HOME:?}/.steam/steam/config/config.vdf"
+    # 4. Initialize Steam Config (Proton support)
+    CONFIG_VDF="${USER_HOME}/.steam/steam/config/config.vdf"
     if [ ! -f "${CONFIG_VDF}" ]; then
         print_step_header "Initializing Steam config"
         mkdir -p "$(dirname "${CONFIG_VDF}")"
         echo "${default_steam_config}" >"${CONFIG_VDF}"
-        chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.steam"
-        chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.local/share/Steam"
-    else
-        print_step_header "Steam config already exists, skipping initialization"
     fi
 
-    # Ensure Steam library folder is set to /mnt/games if not already
-    # The .deb client checks this path for library management
-    LIBRARY_VDF="${USER_HOME:?}/.steam/steam/steamapps/libraryfolders.vdf"
+    # 5. Initialize Steam Library folder
+    LIBRARY_VDF="${USER_HOME}/.steam/steam/steamapps/libraryfolders.vdf"
     if [ ! -f "${LIBRARY_VDF}" ]; then
         print_step_header "Initializing Steam library"
         mkdir -p "$(dirname "${LIBRARY_VDF}")"
         echo "${default_steam_library_config}" >"${LIBRARY_VDF}"
         
-        # Ensure correct ownership of the newly created library config
-        chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.steam"
-        chown -R "${USER:?}:${USER:?}" "${USER_HOME:?}/.local/share/Steam"
-
-        # Only if we have mounted a /mnt/games path, then make the default games library for steam
+        # Setup external /mnt/games if available
         if [ -d "/mnt/games" ]; then
             mkdir -p "/mnt/games/GameLibrary/Steam/steamapps"
-            chown -R "${USER:?}:${USER:?}" "/mnt/games/GameLibrary"
             echo "${games_steam_library_config}" >"/mnt/games/GameLibrary/Steam/libraryfolder.vdf"
         fi
-    else
-        print_step_header "Steam library config already exists, skipping initialization"
     fi
+
+    # 6. Apply permissions to all paths
+    print_step_header "Setting permissions for Steam paths"
+    chown -R "${USER:?}:${USER:?}" \
+        "${USER_HOME}/.steam" \
+        "${USER_HOME}/.local/share/Steam" \
+        2>/dev/null
+
+    if [ -d "/mnt/games/GameLibrary" ]; then
+        chown -R "${USER:?}:${USER:?}" "/mnt/games/GameLibrary"
+    fi
+
 else
     print_step_header "Disable Steam service"
     sed -i 's|^autostart.*=.*$|autostart=false|' /etc/supervisor.d/steam.ini
