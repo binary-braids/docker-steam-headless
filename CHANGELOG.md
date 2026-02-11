@@ -1,3 +1,12 @@
+# [0.3.0](https://github.com/binary-braids/docker-steam-headless/compare/v0.2.0...v0.3.0) (2026-02-11)
+
+
+### Features
+
+* update Steam configuration script for improved path handling and symlink setup ([eb1a552](https://github.com/binary-braids/docker-steam-headless/commit/eb1a5529925e6e5207565b6d65fb42c237eb6e45))
+
+
+
 # [0.2.0](https://github.com/binary-braids/docker-steam-headless/compare/v0.1.4...v0.2.0) (2026-02-11)
 
 
