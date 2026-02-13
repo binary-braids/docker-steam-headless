@@ -13,7 +13,7 @@
             "image-path": "steam.png",
             "exclude-global-prep-cmd": "true",
             "detached": [
-                "\/usr\/games\/steam steam:\/\/open\/bigpicture",
+                "\/usr\/bin\/steam steam:\/\/open\/bigpicture",
                 "\/usr\/bin\/sunshine-run sleep infinity"
             ],
             "prep-cmd": [
@@ -31,7 +31,7 @@
                 },
                 {
                     "do": "",
-                    "undo": "\/usr\/games\/steam steam:\/\/close\/bigpicture"
+                    "undo": "\/usr\/bin\/steam steam:\/\/close\/bigpicture"
                 }
             ]
         }
