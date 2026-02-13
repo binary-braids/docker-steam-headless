@@ -1,3 +1,12 @@
+## [0.3.1](https://github.com/binary-braids/docker-steam-headless/compare/v0.3.0...v0.3.1) (2026-02-13)
+
+
+### Bug Fixes
+
+* update Steam executable path from /usr/games/steam to /usr/bin/steam in configuration files ([dc61ee8](https://github.com/binary-braids/docker-steam-headless/commit/dc61ee8efe4c8bd7889537e80dfe7c17a8e5f978))
+
+
+
 # [0.3.0](https://github.com/binary-braids/docker-steam-headless/compare/v0.2.0...v0.3.0) (2026-02-11)
 
 
