@@ -26,4 +26,7 @@
     "after 2am",
     "before 5am"
   ]
+  "forkProcessing": [
+    "enabled"
+  ]
 }
